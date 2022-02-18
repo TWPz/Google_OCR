@@ -3,7 +3,7 @@ from google.cloud import vision
 import io
 import os
 
-import re
+import re #regex101.com
 
 # USING GOOGLE VISION API TO READ TEXT FROM RECEIPTS PART *********************
 
