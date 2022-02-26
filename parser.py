@@ -182,7 +182,7 @@ def flow(source):
     return json
 
 
-print(type(case))
+#print(type(case))
 
 print(flow(case))
 
