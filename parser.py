@@ -18,7 +18,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_O
   
 client = vision.ImageAnnotatorClient()
 
-with io.open('tests/costco.JPG', 'rb') as image_file:
+with io.open('tests/1.JPG', 'rb') as image_file:
     content = image_file.read()
 
 image = vision.Image(content=content)
@@ -48,7 +48,7 @@ re_walmart = 'Walmart|walmart|WALMART'
 re_tnt = 'T&T|t&t|tnt'
 re_tnt_start_slice = 'GROCERY|Grocery|grocery'
 re_tnt_end_slice = 'SERVICE COUNTER|service counter|Service Counter'
-re_tnt_remove_item = '\$|FOOD|PRODUCE|DELI'
+# re_tnt_remove_item = '\$|FOOD|PRODUCE|DELI|SEAFOOD|MEAT'
 
 
 # ********************* Code Part **********************************
@@ -111,7 +111,7 @@ def regex_parser(source):
         # not using regex, simply iterate again
         newlist =[]
         for line in res:
-            if line.find('$') != -1 or line.find('FOOD') != -1  or line.find('DELI') != -1 or line.find('PRODUCE') != -1 :
+            if line.find('$') != -1 or line.find('FOOD') != -1  or line.find('DELI') != -1 or line.find('PRODUCE') != -1 or line.find('MEAT') != -1: # seafood is contained in food search
                 continue
             else:
                 newlist.append(line.replace('(SALE) ','').lower())
@@ -130,6 +130,25 @@ def isEnglish(source):
             en_only.append(s)
     return en_only
   
+def item_final_clean_before_df(items):
+    # after parser before df
+    # purify data in case of failure in OCR engine for errors 
+    # case 1: "(" special characters and length smaller than 2 tend to be invalid input source, simply delete would work
+    # case 2: special items with keyword that does not look like food, eg: sanitizer, 
+    # case 3: clean up missing matched words --> food as f000 
+    print(items)
+    for item in items: # modify inplace
+        print("item ", item)
+        if len(item) <= 2 or len(item.split()) == 1:
+            items.remove(item)
+        if item.find('sanitizer') != -1: 
+            items.remove(item)
+        if item.find('f000') != -1 :
+            idx = items.index(item)
+            items[idx] = items[idx].replace('f000','food')
+    return items
+        
+
 
 def list_dataframe_json(uncounted_item_list):
     newlist = uncounted_item_list
@@ -152,6 +171,8 @@ def df_json(df):
     # df.to_json('temp.json', orient='records', lines=True)
     return json
 
+
+ 
 def flow(source):
     # entire process flow for examples:
     ####-----  FLOW  -----####
@@ -171,13 +192,22 @@ def flow(source):
         3.9 construct item-quantity table and fill in pre-determined information 
         3.10 convert to JSON format
     4: send JSON body to mongodb remote via api calls (to do)
+            ingredient form new column --> best before date
+             extra: match item name with the ingredients info (to do)
 
-    extra: match item name with the ingredients info (to do)
+
+       
+
+
+
+
+
 
     '''
     ####-----  FLOW  -----####
     item = regex_parser(source)
-    df = list_dataframe_json(item)
+    df = list_dataframe_json(item_final_clean_before_df(item))
+    # print(df)
     json = df_json(df)
     return json
 
