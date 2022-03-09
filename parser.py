@@ -5,6 +5,7 @@ import os
 from collections import Counter
 import re
 import pandas as pd
+import datetime
 
 #----------------------
 #| runs in python 3.8 |
@@ -197,15 +198,15 @@ def item_final_clean_before_df(items,store):
 def list_dataframe_json(uncounted_item_list):
     newlist = uncounted_item_list
     ct = Counter(newlist)
-    ctdf = pd.DataFrame.from_records(list(dict(ct).items()), columns=['Item','Quantity'])
-    ctdf['Measure'] = ['piece'] * ctdf.shape[0]
-    ctdf['Best_Before'] = ['1 week'] * ctdf.shape[0]
+    ctdf = pd.DataFrame.from_records(list(dict(ct).items()), columns=['name','amount'])
+    ctdf['unit'] = ['serving'] * ctdf.shape[0]
+    ctdf['best_before'] = [datetime.datetime.now()+datetime.timedelta(days=21)] * ctdf.shape[0]
     return ctdf
 
 def df_json(df):
     # directly return json body
-    json = df.to_json(orient='records')[1:-1].replace('},{', '} {')
-
+    #json = df.to_json(orient='records')[1:-1].replace('},{', '} {')
+    json = df.to_dict('records')
 
     # in case of obtain the json file
     # use:
@@ -214,8 +215,6 @@ def df_json(df):
     #     f.write(out)
     # df.to_json('temp.json', orient='records', lines=True)
     return json
-
-
 
 def flow(source):
     # entire process flow for examples:
