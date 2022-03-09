@@ -3,7 +3,7 @@ from google.cloud import vision
 import io
 import os
 from collections import Counter
-import re 
+import re
 import pandas as pd
 
 #----------------------
@@ -13,12 +13,12 @@ import pandas as pd
 # USING GOOGLE VISION API TO READ TEXT FROM RECEIPTS PART *********************
 # ********************* API Part **********************************
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_OCR/custom-utility-341701-330efe16ea40.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_OCR/ocrbackup-0da0a5fa15d7.json"
 
-  
+
 client = vision.ImageAnnotatorClient()
 
-with io.open('tests/1.JPG', 'rb') as image_file:
+with io.open('tests/test.JPG', 'rb') as image_file:
     content = image_file.read()
 
 image = vision.Image(content=content)
@@ -62,31 +62,31 @@ def store_name(source):
         if re.findall(re_costco, i):
             return "Costco"
     return "store_name_not_detected"
-    # currently not reading other receipts 
+    # currently not reading other receipts
 
 
 def text_clean_up(source,store):
     # locate specific words for clean up with items left only
-    start = -1 
+    start = -1
     end = -1
     cleaned_source = []
     poplist = []
-    
+
     if store == "T&T":
         source = isEnglish(source)
         for index in range(len(source)):
             if re.findall(re_tnt_start_slice, source[index]):
-                start = index   
+                start = index
             if re.findall(re_tnt_end_slice, source[index]):
                 end = index
         #print(start,end,"<---")
         cleaned_source = source[start+1:end-len(poplist)]
-        
+
     elif store == 'Costco':
         for index in range(len(source)):
             #print(index,"   :  " ,source[index])
             if re.findall(re_costco_start_slice, source[index]):
-                start = index   
+                start = index
             if re.findall(re_costco_end_slice, source[index]):
                 end = index
             if 'TPD' in source[index]:
@@ -96,7 +96,7 @@ def text_clean_up(source,store):
         for ind in poplist:
             del source[ind]
         cleaned_source = source[start+1:end-len(poplist)]
-            
+
     return cleaned_source
 
 
@@ -111,11 +111,11 @@ def regex_parser(source):
         # not using regex, simply iterate again
         newlist =[]
         for line in res:
-            if line.find('$') != -1 or line.find('FOOD') != -1  or line.find('DELI') != -1 or line.find('PRODUCE') != -1 or line.find('MEAT') != -1: # seafood is contained in food search
+            if line.find('FOOD') != -1  or line.find('DELI') != -1 or line.find('PRODUCE') != -1 or line.find('MEAT') != -1: # seafood is contained in food search
                 continue
             else:
                 newlist.append(line.replace('(SALE) ','').lower())
-    return newlist
+    return newlist,store
 
 
 # we need : {item_name, item_quantity, unit of measurement, best_before_date}
@@ -129,25 +129,69 @@ def isEnglish(source):
         if s.isascii():
             en_only.append(s)
     return en_only
-  
-def item_final_clean_before_df(items):
+
+def item_final_clean_before_df(items,store):
+    if store == 'T&T':
     # after parser before df
-    # purify data in case of failure in OCR engine for errors 
+    # purify data in case of failure in OCR engine for errors
     # case 1: "(" special characters and length smaller than 2 tend to be invalid input source, simply delete would work
-    # case 2: special items with keyword that does not look like food, eg: sanitizer, 
-    # case 3: clean up missing matched words --> food as f000 
-    print(items)
-    for item in items: # modify inplace
-        print("item ", item)
-        if len(item) <= 2 or len(item.split()) == 1:
-            items.remove(item)
-        if item.find('sanitizer') != -1: 
-            items.remove(item)
-        if item.find('f000') != -1 :
-            idx = items.index(item)
-            items[idx] = items[idx].replace('f000','food')
+    # case 2: special items with keyword that does not look like food, eg: sanitizer,
+    # case 3: clean up missing matched words --> food as f000
+        re_tnt_price_quantity_info_1 = '.*\$.*[\d]e[a|d]'
+        re_tnt_price_quantity_info_2 = '\/\$[\d]'
+        addition = []
+        del_idx = []
+        for idx in range(len(items)):
+
+            if items[idx].find('$') != -1:
+                if re.search(re_tnt_price_quantity_info_1, items[idx]) == None and re.search(re_tnt_price_quantity_info_2, items[idx]) == None:
+                    del_idx.append(idx)
+                if re.search(re_tnt_price_quantity_info_1, items[idx]) != None:
+                    # 2 @ $5.99ea. --yes
+                    # 2 1a2 @ $2.99ea. --- yes
+                    # 12232 @ $2.99ea.  --yes
+                    # 1 1 2 @ $2.99ea.  --yes
+                    item_no_space = items[idx].replace(' ','')
+                    if item_no_space.find('@') != -1:
+                        quantity = items[idx][item_no_space.find('@')-1]
+                    else:
+                        quantity = items[idx][0]
+                    if quantity.isnumeric():
+                        items[idx] = quantity
+                        if  10 > int(quantity) > 1:
+                            for i in range(int(quantity)-1):
+                                addition.append(items[idx-1])
+
+
+                if re.search(re_tnt_price_quantity_info_2, items[idx]) != None:
+                    quantity = min(items[idx].split(' '), key=len)
+                    items[idx] = quantity
+                    if  10 > int(quantity) > 1:
+                        for i in range(int(quantity)-1):
+                            addition.append(items[idx-1])
+                    # 171330 2 @ga2/$3.29'  --yes
+                    # 171330 2 22/$3.29'  --yes
+            # The order here matters:
+            # '''
+            #             we first process the quantity and add the extra items into the bucket list in ADDITION
+            #             then we remove the quantity afterwards
+            #             at the end we append the addition list into the item list
+            # '''
+            if len(items[idx]) <= 2 or len(items[idx].split()) == 1:
+                del_idx.append(idx)
+            if items[idx].find('sanitizer') != -1:
+                del_idx.append(idx)
+            if items[idx].find('f000') != -1 :
+                items[idx] = items[idx].replace('f000','food')
+
+        for idx in del_idx[-1::-1]:
+            del items[idx]
+        # add the repeated items into items list
+        items.extend(addition)
     return items
-        
+
+
+
 
 
 def list_dataframe_json(uncounted_item_list):
@@ -172,31 +216,29 @@ def df_json(df):
     return json
 
 
- 
+
 def flow(source):
     # entire process flow for examples:
     ####-----  FLOW  -----####
     '''
+    0.1 : preprocess images for better vision
     1: fetch images into GOOGLE vision API
     2: obtain the results for store matchup
     3: if TNT then
         3.1 remove all non-english words
         3.2 determine start-end point
-        3.3 parse by removing extra useless information 
-        3.4 construct item-quantity table and fill in pre-determined information 
+        3.3 parse by removing extra useless information
+        3.4 construct item-quantity table and fill in pre-determined information
         3.5 convert to JSON format
        if Costco then
         3.6 determine start-end point
         3.7 remove discounts information
         3.8 remove item numbers in parsing process
-        3.9 construct item-quantity table and fill in pre-determined information 
+        3.9 construct item-quantity table and fill in pre-determined information
         3.10 convert to JSON format
     4: send JSON body to mongodb remote via api calls (to do)
-            ingredient form new column --> best before date
-             extra: match item name with the ingredients info (to do)
 
 
-       
 
 
 
@@ -205,9 +247,9 @@ def flow(source):
 
     '''
     ####-----  FLOW  -----####
-    item = regex_parser(source)
-    df = list_dataframe_json(item_final_clean_before_df(item))
-    # print(df)
+    item,store = regex_parser(source)
+    df = list_dataframe_json(item_final_clean_before_df(item,store))
+    print(df)
     json = df_json(df)
     return json
 
@@ -215,4 +257,3 @@ def flow(source):
 #print(type(case))
 
 print(flow(case))
-
