@@ -19,7 +19,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_O
 
 client = vision.ImageAnnotatorClient()
 
-with io.open('tests/222.jpg', 'rb') as image_file:
+with io.open('tests/demo1.JPG', 'rb') as image_file:
     content = image_file.read()
 
 image = vision.Image(content=content)
@@ -187,6 +187,7 @@ def item_final_clean_before_df(items,store):
         # --------- price clean up
         re_tnt_price_quantity_info_1 = '.*\$.*[\d]e[a|d]'
         re_tnt_price_quantity_info_2 = '\/\$[\d]'
+        re_tnt_weird_price = '\d*\.\d*'
         addition = []
         del_idx = []
         for idx in range(len(items)):
@@ -213,10 +214,16 @@ def item_final_clean_before_df(items,store):
 
                 if re.search(re_tnt_price_quantity_info_2, items[idx]) != None:
                     quantity = min(items[idx].split(' '), key=len)
-                    items[idx] = quantity
-                    if  10 > int(quantity) > 1:
-                        for i in range(int(quantity)-1):
-                            addition.append(items[idx-1])
+                    if quantity.isnumeric():
+                        items[idx] = quantity
+                        if  10 > int(quantity) > 1:
+                            for i in range(int(quantity)-1):
+                                addition.append(items[idx-1])
+                    elif quantity[0].isnumeric():
+                        items[idx] = quantity[0]
+                        if  10 > int(quantity[0]) > 1:
+                            for i in range(int(quantity[0])-1):
+                                addition.append(items[idx-1])
                     # 171330 2 @ga2/$3.29'  --yes
                     # 171330 2 22/$3.29'  --yes
             # The order here matters:
@@ -227,12 +234,19 @@ def item_final_clean_before_df(items,store):
             # '''
             #if len(items[idx]) <= 2 or len(items[idx].split()) == 1:
             if len(items[idx]) <= 3:
-                del_idx.append(idx)
-            if items[idx].find('sanitizer') != -1 or items[idx].find('heat') != -1:
-                del_idx.append(idx)
+                if idx not in del_idx:
+                    del_idx.append(idx)
+            # remove any extra wrongly detect words and not food related words
+            if items[idx].find('sanitizer') != -1 or items[idx].find('heat') != -1 or items[idx].find('neat') != -1 or items[idx].find('mask') != -1:
+                if idx not in del_idx:
+                    del_idx.append(idx)
             if items[idx].find('f000') != -1 :
                 items[idx] = items[idx].replace('f000','food')
+            if re.search(re_tnt_weird_price, items[idx]) != None:
+                if idx not in del_idx:
+                    del_idx.append(idx)
 
+        print("del", del_idx)
         for idx in del_idx[-1::-1]:
             del items[idx]
         # add the repeated items into items list
