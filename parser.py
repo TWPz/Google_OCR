@@ -19,7 +19,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_O
 
 client = vision.ImageAnnotatorClient()
 
-with io.open('tests/demo1.JPG', 'rb') as image_file:
+with io.open('tests/222.jpg', 'rb') as image_file:
     content = image_file.read()
 
 image = vision.Image(content=content)
@@ -48,11 +48,25 @@ re_costco_prefix = '[\d{3,}]+ '
 re_walmart = 'Walmart|walmart|WALMART'
 # ---------------------TNT-------------------------------
 re_tnt = 'T&T|t&t|tnt'
-re_tnt_start_slice_1= 'GROCERY|Grocery|grocery|GR0CERY'
-re_tnt_start_slice_2= 'MEAT|meat|Meat'
-re_tnt_end_slice = 'SERVICE COUNTER|service counter|Service Counter'
-# re_tnt_remove_item = '\$|FOOD|PRODUCE|DELI|SEAFOOD|MEAT'
+re_tnt_start_alert_1 = 'ONLINE'
+re_tnt_start_alert_6 = 'DELIVERY'
+re_tnt_slice_1= 'GROCERY|Grocery|grocery|GR0CERY'
+re_tnt_slice_2= 'FOOD|F000|F00d|F00D|food|Food'
+re_tnt_slice_3= 'MEAT|meat|Meat|HEAT|Heat'
+re_tnt_slice_4= 'SEAFOOD|seafood|SEAF000|SEAF00D'
+re_tnt_slice_5= 'PRODUCE|produce|PR0DUCE'
+re_tnt_slice_6= 'DELI|DELl|deli'
+re_tnt_slice_7= 'SERVICE COUNTER|service counter|Service Counter|SERVICECOUNTER'
 
+# re_tnt_remove_item = '\$|FOOD|PRODUCE|DELI|SEAFOOD|MEAT'
+# #-------order-----
+# GROCERY
+# FOOD
+# MEAT
+# SEAFOOD
+# PRODUCE
+# DELI
+# SERVICE COUNTER
 
 # ********************* Code Part **********************************
 
@@ -78,14 +92,32 @@ def text_clean_up(source,store):
     if store == "T&T":
         source = isEnglish(source)
         for index in range(len(source)):
-
-            if re.findall(re_tnt_start_slice_1, source[index]) and start == -1:
+            if len(re.findall(re_tnt_slice_1, source[index])) != 0 and start == -1 and len(re.findall(re_tnt_start_alert_1, source[index])) == 0:
                 start = index
-            elif re.findall(re_tnt_start_slice_2, source[index]) and start == -1:
+            elif len(re.findall(re_tnt_slice_2, source[index])) != 0  and start == -1:
                 start = index
-            if re.findall(re_tnt_end_slice, source[index]):
+            elif len(re.findall(re_tnt_slice_3, source[index])) != 0  and start == -1:
+                start = index
+            elif len(re.findall(re_tnt_slice_4, source[index])) != 0  and start == -1:
+                start = index
+            elif len(re.findall(re_tnt_slice_5, source[index])) != 0  and start == -1:
+                start = index
+            elif len(re.findall(re_tnt_slice_6, source[index])) != 0  and start == -1 and len(re.findall(re_tnt_start_alert_6, source[index])) == 0:
+                start = index
+            if len(re.findall(re_tnt_slice_7, source[index])) != 0 and index != start:
                 end = index
-        #print(start,end,"<---")
+            elif len(re.findall(re_tnt_slice_6, source[index])) != 0  and len(re.findall(re_tnt_start_alert_6, source[index])) == 0 and index != start:
+                end = index
+            elif len(re.findall(re_tnt_slice_5, source[index])) != 0  and index != start:
+                end = index
+            elif len(re.findall(re_tnt_slice_4, source[index])) != 0  and index != start:
+                end = index
+            elif len(re.findall(re_tnt_slice_3, source[index])) != 0  and index != start:
+                end = index
+            elif len(re.findall(re_tnt_slice_2, source[index])) != 0  and index != start:
+                end = index
+            elif len(re.findall(re_tnt_slice_1, source[index])) != 0  and len(re.findall(re_tnt_start_alert_1, source[index])) == 0 and index != start:
+                end = index
         cleaned_source = source[start+1:end-len(poplist)]
 
     elif store == 'Costco':
@@ -117,7 +149,14 @@ def regex_parser(source):
         # not using regex, simply iterate again
         newlist =[]
         for line in res:
-            if line.find('FOOD') == 0  or line.find('DELI') == 0 or line.find('PRODUCE') == 0 or line.find('MEAT') == 0: # seafood is contained in food search
+            # #-------order-----
+            # GROCERY
+            # FOOD
+            # MEAT
+            # SEAFOOD
+            # PRODUCE
+            # DELI
+            if line.find('FOOD') == 0  or line.find('DELI') == 0 or line.find('PRODUCE') == 0 or line.find('MEAT') == 0 or line.find('SEAFOOD') == 0 or line.find('GROCERY') == 0:
                 continue
             else:
                 newlist.append(line.replace('(SALE) ','').lower())
@@ -145,6 +184,7 @@ def item_final_clean_before_df(items,store):
     # case 1: "(" special characters and length smaller than 2 tend to be invalid input source, simply delete would work
     # case 2: special items with keyword that does not look like food, eg: sanitizer,
     # case 3: clean up missing matched words --> food as f000
+        # --------- price clean up
         re_tnt_price_quantity_info_1 = '.*\$.*[\d]e[a|d]'
         re_tnt_price_quantity_info_2 = '\/\$[\d]'
         addition = []
@@ -188,7 +228,7 @@ def item_final_clean_before_df(items,store):
             #if len(items[idx]) <= 2 or len(items[idx].split()) == 1:
             if len(items[idx]) <= 3:
                 del_idx.append(idx)
-            if items[idx].find('sanitizer') != -1:
+            if items[idx].find('sanitizer') != -1 or items[idx].find('heat') != -1:
                 del_idx.append(idx)
             if items[idx].find('f000') != -1 :
                 items[idx] = items[idx].replace('f000','food')
@@ -198,8 +238,6 @@ def item_final_clean_before_df(items,store):
         # add the repeated items into items list
         items.extend(addition)
 
-        for k in items:
-            print("============  ", k)
     return items
 
 
