@@ -19,7 +19,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_O
 
 client = vision.ImageAnnotatorClient()
 
-with io.open('tests/test.JPG', 'rb') as image_file:
+with io.open('tests/demo1.JPG', 'rb') as image_file:
     content = image_file.read()
 
 image = vision.Image(content=content)
@@ -44,10 +44,12 @@ re_costco_start_slice = 'TN Member'
 re_costco_end_slice = 'SUBTOTAL'
 re_costco_item = '\d{3,}\s[0-9A-Z/%.]+ *[ *0-9A-Z/%]*'
 re_costco_prefix = '[\d{3,}]+ '
-# ---------------------TNT-------------------------------
+# ---------------------walmart-------------------------------
 re_walmart = 'Walmart|walmart|WALMART'
+# ---------------------TNT-------------------------------
 re_tnt = 'T&T|t&t|tnt'
-re_tnt_start_slice = 'GROCERY|Grocery|grocery'
+re_tnt_start_slice_1= 'GROCERY|Grocery|grocery|GR0CERY'
+re_tnt_start_slice_2= 'MEAT|meat|Meat'
 re_tnt_end_slice = 'SERVICE COUNTER|service counter|Service Counter'
 # re_tnt_remove_item = '\$|FOOD|PRODUCE|DELI|SEAFOOD|MEAT'
 
@@ -76,7 +78,10 @@ def text_clean_up(source,store):
     if store == "T&T":
         source = isEnglish(source)
         for index in range(len(source)):
-            if re.findall(re_tnt_start_slice, source[index]):
+
+            if re.findall(re_tnt_start_slice_1, source[index]) and start == -1:
+                start = index
+            elif re.findall(re_tnt_start_slice_2, source[index]) and start == -1:
                 start = index
             if re.findall(re_tnt_end_slice, source[index]):
                 end = index
@@ -112,10 +117,12 @@ def regex_parser(source):
         # not using regex, simply iterate again
         newlist =[]
         for line in res:
-            if line.find('FOOD') != -1  or line.find('DELI') != -1 or line.find('PRODUCE') != -1 or line.find('MEAT') != -1: # seafood is contained in food search
+            if line.find('FOOD') == 0  or line.find('DELI') == 0 or line.find('PRODUCE') == 0 or line.find('MEAT') == 0: # seafood is contained in food search
                 continue
             else:
                 newlist.append(line.replace('(SALE) ','').lower())
+    for i in newlist:
+        print("-------------", i)
     return newlist,store
 
 
@@ -178,7 +185,8 @@ def item_final_clean_before_df(items,store):
             #             then we remove the quantity afterwards
             #             at the end we append the addition list into the item list
             # '''
-            if len(items[idx]) <= 2 or len(items[idx].split()) == 1:
+            #if len(items[idx]) <= 2 or len(items[idx].split()) == 1:
+            if len(items[idx]) <= 3:
                 del_idx.append(idx)
             if items[idx].find('sanitizer') != -1:
                 del_idx.append(idx)
@@ -189,6 +197,9 @@ def item_final_clean_before_df(items,store):
             del items[idx]
         # add the repeated items into items list
         items.extend(addition)
+
+        for k in items:
+            print("============  ", k)
     return items
 
 
