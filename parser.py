@@ -6,6 +6,11 @@ from collections import Counter
 import re
 import pandas as pd
 import datetime
+import timeit
+
+
+
+
 
 #----------------------
 #| runs in python 3.8 |
@@ -19,7 +24,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="/Users/zp_macmini/Desktop/Google_O
 
 client = vision.ImageAnnotatorClient()
 
-with io.open('tests/demo1.JPG', 'rb') as image_file:
+with io.open('tests/c2.JPG', 'rb') as image_file:
     content = image_file.read()
 
 image = vision.Image(content=content)
@@ -33,16 +38,16 @@ labels = response.label_annotations
 case = response.text_annotations[0].description.split("\n")
 
 
-
+start = timeit.default_timer()
 
 # this parser is used independently for both google api and google ocr cloud server request
 # in case of using only one of the above in the future
 # ********************* REGEX Part **********************************
 # ---------------------Costco---------------------------
 re_costco = 'Costco|COSTCO|costco|TPD'
-re_costco_start_slice = 'TN Member'
+re_costco_start_slice = 'Member'
 re_costco_end_slice = 'SUBTOTAL'
-re_costco_item = '\d{3,}\s[0-9A-Z/%.]+ *[ *0-9A-Z/%]*'
+re_costco_item = '\d{2,}\s[0-9A-Z/%.]+ *[ *0-9A-Z/%]*'
 re_costco_prefix = '[\d{3,}]+ '
 # ---------------------walmart-------------------------------
 re_walmart = 'Walmart|walmart|WALMART'
@@ -160,8 +165,6 @@ def regex_parser(source):
                 continue
             else:
                 newlist.append(line.replace('(SALE) ','').lower())
-    for i in newlist:
-        print("-------------", i)
     return newlist,store
 
 
@@ -246,11 +249,14 @@ def item_final_clean_before_df(items,store):
                 if idx not in del_idx:
                     del_idx.append(idx)
 
-        print("del", del_idx)
+        #print("del", del_idx)
         for idx in del_idx[-1::-1]:
             del items[idx]
         # add the repeated items into items list
         items.extend(addition)
+
+
+
 
     return items
 
@@ -319,3 +325,6 @@ def flow(source):
 #print(type(case))
 
 print(flow(case))
+stop = timeit.default_timer()
+
+print('Time: ', stop - start)
